@@ -38,7 +38,6 @@ async function run() {
         if (e.indyName === 'PoolLedgerConfigAlreadyExistsError') {}
         else { throw e }
     }
-
     // 2.
     log('2. Open pool ledger and get handle from libindy')
     const poolHandle = await indy.openPoolLedger(poolName, undefined)
@@ -82,33 +81,61 @@ async function run() {
 
     // 8.
     log('8. Sending NYM request to the ledger')
-    await indy.signAndSubmitRequest(/*pool_handle*/ poolHandle,
-                                    /*wallet_handle*/ walletHandle,
-                                    /*submitter_did*/ stewardDid,
-                                    /*request_json*/ nymRequest)
+    const nymTransactionResponse = await indy.signAndSubmitRequest(
+        /*pool_handle*/ poolHandle,
+        /*wallet_handle*/ walletHandle,
+        /*submitter_did*/ stewardDid,
+        /*request_json*/ nymRequest)
+
+    logValue(`NYM transaction response: ${JSON.stringify(nymTransactionResponse)}`)
 
     // 9.
-    log('9. Generating and storing DID and verkey representing a Client that wants to obtain Trust Anchor Verkey')
-    const [clientDid, clientVerkey] = await indy.createAndStoreMyDid(walletHandle, "{}")
-    logValue('Client DID: ', clientDid)
-    logValue('Client Verkey: ', clientVerkey)
+    log('9. Issuer create Credential Schema')
+    const schema = {
+        'name': 'gvt',
+        'version': '1.0',
+        'attributes': '["age", "sex", "height", "name"]'
+    }
+
+    const [issuerSchemaId, issuerSchemaJson] = await indy.issuerCreateSchema(
+        stewardDid, 
+        schema['name'],
+        schema['version'],
+        schema['attributes'])
+    
+    logValue(`Schema(${issuerSchemaId}): ${JSON.stringify(issuerSchemaJson)}`)
 
     // 10.
-    log('10. Building the GET_NYM request to query trust anchor verkey')
-    const getNymRequest = await indy.buildGetNymRequest(/*submitter_did*/ clientDid,
-                                                         /*target_did*/ trustAnchorDid)
+    log('10. Build the SCHEMA request to add new schema to the ledger')
+    const schemaRequest = await indy.buildSchemaRequest(stewardDid, issuerSchemaJson)
+    logValue(`Schema request: ${schemaRequest}`)
 
     // 11.
-    log('11. Sending the Get NYM request to the ledger')
-    const getNymResponse = await indy.submitRequest(/*pool_handle*/ poolHandle,
-                                                   /*request_json*/ getNymRequest)
+    log('11. Sending the SCHEMA request to the ledger')
+    const schemaResponse = await indy.signAndSubmitRequest(
+        poolHandle,
+        walletHandle,
+        stewardDid,
+        schemaRequest)
+    
+    logValue(`Schema response: ${JSON.stringify(schemaResponse)}`)
+
 
     // 12.
-    log('12. Comparing Trust Anchor verkey as written by Steward and as retrieved in GET_NYM response submitted by Client')
-    logValue('Written by Steward: ', trustAnchorVerkey)
-    const verkeyFromLedger = JSON.parse(getNymResponse['result']['data'])['verkey']
-    logValue('Queried from ledger: ', verkeyFromLedger)
-    logValue('Matching: ', verkeyFromLedger == trustAnchorVerkey)
+    log('12. Creating and storing Credential Definition using anoncreds as Trust Anchor, for the given Schema')
+    const credDefTag = 'TAG1'
+    const credDefType = 'CL'
+    const credDefConfig = {"support_revocation": false}
+
+    const [credDefId, credDefJson] = await indy.issuerCreateAndStoreCredentialDef(
+        walletHandle,
+        trustAnchorDid,
+        issuerSchemaJson,
+        credDefTag,
+        credDefType,
+        credDefConfig)
+    
+    logValue(`Credential Definition(${credDefId}): ${JSON.stringify(credDefJson)}`)
 
     // 13.
     log('13. Closing wallet and pool')
