@@ -1,15 +1,9 @@
 /**
- * Example demonstrating how to add DID with the role of Trust Anchor as Steward.
- *
- * Uses seed to obtain Steward's DID which already exists on the ledger.
- * Then it generates new DID/Verkey pair for Trust Anchor.
- * Using Steward's DID, NYM transaction request is built to add Trust Anchor's DID and Verkey
- * on the ledger with the role of Trust Anchor.
- * Once the NYM is successfully written on the ledger, it generates new DID/Verkey pair that represents
- * a client, which are used to create GET_NYM request to query the ledger and confirm Trust Anchor's Verkey.
- *
- * For the sake of simplicity, a single wallet is used. In the real world scenario, three different wallets
- * would be used and DIDs would be exchanged using some channel of communication
+ * Example demonstrating how to write Schema and Cred Definition on the ledger
+ * As a setup, Steward (already on the ledger) adds Trust Anchor to the ledger.
+ * After that, Steward builds the SCHEMA request to add new schema to the ledger.
+ * Once that succeeds, Trust Anchor uses anonymous credentials to issue and store
+ * claim definition for the Schema added by Steward.
  */
 
 const indy = require('indy-sdk')
@@ -73,11 +67,12 @@ async function run() {
 
     // 7.
     log('7. Building NYM request to add Trust Anchor to the ledger')
-    const nymRequest = await indy.buildNymRequest(/*submitter_did*/ stewardDid,
-                                                 /*target_did*/ trustAnchorDid,
-                                                 /*ver_key*/ trustAnchorVerkey,
-                                                 /*alias*/ undefined,
-                                                 /*role*/ 'TRUST_ANCHOR')
+    const nymRequest = await indy.buildNymRequest(
+        /*submitter_did*/ stewardDid,
+        /*target_did*/ trustAnchorDid,
+        /*ver_key*/ trustAnchorVerkey,
+        /*alias*/ undefined,
+        /*role*/ 'TRUST_ANCHOR')
 
     // 8.
     log('8. Sending NYM request to the ledger')
